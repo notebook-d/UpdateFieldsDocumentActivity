@@ -1,0 +1,31 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.8.34330.188
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "UpdateFieldsDocumentActivity", "UpdateFieldsDocumentActivity\UpdateFieldsDocumentActivity.csproj", "{1E825B53-A729-4F5C-9085-4DC0B13465A3}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "ShellClientApp", "ShellClientApp\ShellClientApp\ShellClientApp.csproj", "{6D2770D0-8BA1-4688-83B5-F91B58B4E882}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{1E825B53-A729-4F5C-9085-4DC0B13465A3}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{1E825B53-A729-4F5C-9085-4DC0B13465A3}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{1E825B53-A729-4F5C-9085-4DC0B13465A3}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{1E825B53-A729-4F5C-9085-4DC0B13465A3}.Release|Any CPU.Build.0 = Release|Any CPU
+		{6D2770D0-8BA1-4688-83B5-F91B58B4E882}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{6D2770D0-8BA1-4688-83B5-F91B58B4E882}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{6D2770D0-8BA1-4688-83B5-F91B58B4E882}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{6D2770D0-8BA1-4688-83B5-F91B58B4E882}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {509DB191-7869-452B-B62F-92882669DE4E}
+	EndGlobalSection
+EndGlobal

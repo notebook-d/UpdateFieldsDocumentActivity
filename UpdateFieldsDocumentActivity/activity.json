@@ -1,0 +1,16 @@
+[
+  {
+    "when": "DocumentOpened",
+    "params": {
+      "triggerType": "Client",
+      "sourceTypes": []
+    },
+    "then": [
+      {
+        "activity": "UpdateFieldsDocumentActivity",
+        "params": {
+        }
+      }
+    ]
+  }
+]

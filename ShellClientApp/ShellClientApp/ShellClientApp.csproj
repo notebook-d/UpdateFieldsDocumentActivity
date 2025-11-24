@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <BaseOutputPath>C:\Users\Chaplygin\AppData\Local\ASCON\Pilot-ICE Enterprise\Development\ShellClientApp</BaseOutputPath>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Ascon.Pilot.Server.Api" Version="25.9.0" />
+  </ItemGroup>
+
+</Project>
