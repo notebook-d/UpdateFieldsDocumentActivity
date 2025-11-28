@@ -1,5 +1,7 @@
 ﻿using Ascon.Pilot.SDK;
 using Ascon.Pilot.SDK.Automation;
+using DocumentFormat.OpenXml.Drawing.Charts;
+using Microsoft.Win32;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
@@ -8,8 +10,13 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Reflection;
+using System.Runtime;
 using System.Threading;
 using System.Threading.Tasks;
+using UpdateFieldsDocumentActivity.Services;
+using UpdateFieldsDocumentActivity.Settings;
+using UpdateFieldsDocumentActivity.Settings.Factories;
+using UpdateFieldsDocumentActivity.Settings.Providers;
 
 namespace UpdateFieldsDocumentActivity
 {
@@ -24,11 +31,19 @@ namespace UpdateFieldsDocumentActivity
         private static readonly string[] _docExtensions = { ".doc", ".docx", ".rtf", ".odt" };
         private readonly int _delayMountFile = 1000;
 
+        private readonly AutoFillSettings _autoFillSettings;
+
+        private readonly IPersonalSettings _personalSettings;        
+        private readonly ISettingProvider<AutoFillSettings> _settingsUpdateFieldsDocumentIncludePicture;
+
         [ImportingConstructor]
-        public UpdateFieldsDocumentActivity(IDigitalSigner digitalSigner, IObjectsRepository repository)
+        public UpdateFieldsDocumentActivity(IDigitalSigner digitalSigner, IObjectsRepository repository, IPersonalSettings personalSettings)
         {
             _digitalSigner = digitalSigner;
             _repository = repository;
+
+            _personalSettings = personalSettings;
+            _settingsUpdateFieldsDocumentIncludePicture = SettingProviderFactory<AutoFillSettings>.GetSettingProvider(personalSettings, SettingsFeatureKeys.SettingKey);
         }
 
         public override string Name => nameof(UpdateFieldsDocumentActivity);
@@ -36,6 +51,7 @@ namespace UpdateFieldsDocumentActivity
         public override Task RunAsync(IObjectModifier modifier, IAutomationBackend backend, IAutomationEventContext context, TriggerType triggerType)
         {
             var objectId = context.Source.Id;
+            var objectTypeName = context.Source.Type.Name;
 
             // Проверяем, не обрабатывается ли уже этот объект
             if (IsProcessing(objectId))
@@ -57,7 +73,7 @@ namespace UpdateFieldsDocumentActivity
 
             UpdateImportStatus(modifier, context, objectId, resultValueImportStatus);
 
-            _ = MountFileAsync(modifier, context, resultValueImportStatus);
+            _ = MountFileAsync(context, objectTypeName);
 
             return Task.CompletedTask;
         }
@@ -103,7 +119,7 @@ namespace UpdateFieldsDocumentActivity
         /// <summary>
         /// Монтирует файлы на диск
         /// </summary>
-        private async Task MountFileAsync(IObjectModifier modifier, IAutomationEventContext context, int resultValueImportStatus)
+        private async Task MountFileAsync(IAutomationEventContext context, string objectTypeName)
         {
             var objectId = context.Source.Id;
 
@@ -122,16 +138,19 @@ namespace UpdateFieldsDocumentActivity
                 {
                     _repository.Mount(objectId);
 
-                    var path = await WaitForStoragePathAsync(objectId);
-                    if (string.IsNullOrEmpty(path))
+                    pathOld = await WaitForStoragePathAsync(objectId);
+                    if (string.IsNullOrEmpty(pathOld))
                         return;
+                }
 
-                    UpdateFieldsDocuments(path);
-                }
-                else
-                {
-                    UpdateFieldsDocuments(pathOld);
-                }
+                var files = GetWordFiles(pathOld);
+                if (files.Count == 0) 
+                    return;
+
+                //Обновляем поля-изображения 
+                UpdateIncludePictureField(pathOld, files, objectTypeName);
+                //Обновляем поля
+                UpdateFieldsDocuments(pathOld, files);
             }
             finally
             {
@@ -141,9 +160,45 @@ namespace UpdateFieldsDocumentActivity
         }
 
         /// <summary>
+        /// Обновляет путь во всех докумннтах word согласно  полях INCLUDEPICTURE в документе.
+        /// </summary>
+        /// <param name="documentPath"></param>
+        /// <param name="newImagePath"></param>
+        /// <param name="settingsUpdateFieldsDocumentIncludePicture"></param>
+        public void UpdateIncludePictureField(string pathFolder, List<string> files, string objectTypeName)
+        {
+            if (string.IsNullOrEmpty(objectTypeName)) return;
+
+            var settingsUpdateFieldsDocumentIncludePicture = _settingsUpdateFieldsDocumentIncludePicture.GetSettings();
+            if (settingsUpdateFieldsDocumentIncludePicture?.Types == null) return;
+
+            var settingsUpdateFieldsCurrentObjectTypes = settingsUpdateFieldsDocumentIncludePicture.Types.Where(n => n.Name == objectTypeName);
+            foreach (var settingsUpdateFieldsCurrentObjectType in settingsUpdateFieldsCurrentObjectTypes)
+            {
+                if (settingsUpdateFieldsCurrentObjectType.Fields == null) return;
+                foreach (var field in settingsUpdateFieldsCurrentObjectType.Fields)
+                {
+                    if (string.IsNullOrEmpty(field.PilotFileName)
+                        || string.IsNullOrEmpty(field.FileField)) continue;
+
+                    //Находим картинку по шаблону которую необходимо добавить в поле документа word
+                    var latestImageFileSafe = DirectoryService.FindLatestImageFileByPatternSafe(pathFolder, field.PilotFileName);
+                    if (string.IsNullOrEmpty(latestImageFileSafe)) continue;
+                    
+                    //Обновляем поля INCLUDEPICTURE
+                    foreach (var file in files)
+                    {
+                        UpdateIncludePictureWithOpenXml.UpdateIncludePictureFieldPath(file, latestImageFileSafe, field.FileField);
+                    }
+                }
+            }
+            return;
+        }
+
+        /// <summary>
         /// Обновляем поля в документах word
         /// </summary>
-        private bool UpdateFieldsDocuments(string pathFolder)
+        private bool UpdateFieldsDocuments(string pathFolder, List<string> files)
         {
             var assemblyLocation = Assembly.GetExecutingAssembly().Location;
             var directoryName = Path.GetDirectoryName(assemblyLocation);
@@ -152,7 +207,7 @@ namespace UpdateFieldsDocumentActivity
             if (!File.Exists(exeFile))
                 throw new Exception(string.Format("Ошибка: Не удалось найти файл ShellClientApp.exe в расположении {0}", exeFile));
 
-            var files = GetWordFiles(pathFolder);
+            //var files = GetWordFiles(pathFolder);
 
             foreach (var file in files)
             {
