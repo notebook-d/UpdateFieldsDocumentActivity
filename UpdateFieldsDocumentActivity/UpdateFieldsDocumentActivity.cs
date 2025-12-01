@@ -1,7 +1,5 @@
 ﻿using Ascon.Pilot.SDK;
 using Ascon.Pilot.SDK.Automation;
-using DocumentFormat.OpenXml.Drawing.Charts;
-using Microsoft.Win32;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
@@ -10,7 +8,6 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Reflection;
-using System.Runtime;
 using System.Threading;
 using System.Threading.Tasks;
 using UpdateFieldsDocumentActivity.Services;
@@ -27,14 +24,12 @@ namespace UpdateFieldsDocumentActivity
         private readonly IObjectsRepository _repository;
         private readonly Dictionary<Guid, bool> _processingObjects = new Dictionary<Guid, bool>();
         private readonly object _lockObject = new object();
-
-        private static readonly string[] _docExtensions = { ".doc", ".docx", ".rtf", ".odt" };
+        
         private readonly int _delayMountFile = 1000;
-
-        private readonly AutoFillSettings _autoFillSettings;
 
         private readonly IPersonalSettings _personalSettings;        
         private readonly ISettingProvider<AutoFillSettings> _settingsUpdateFieldsDocumentIncludePicture;
+        private AutoFillSettings _cachedSettings;
 
         [ImportingConstructor]
         public UpdateFieldsDocumentActivity(IDigitalSigner digitalSigner, IObjectsRepository repository, IPersonalSettings personalSettings)
@@ -43,7 +38,7 @@ namespace UpdateFieldsDocumentActivity
             _repository = repository;
 
             _personalSettings = personalSettings;
-            _settingsUpdateFieldsDocumentIncludePicture = SettingProviderFactory<AutoFillSettings>.GetSettingProvider(personalSettings, SettingsFeatureKeys.SettingKey);
+            _settingsUpdateFieldsDocumentIncludePicture = SettingProviderFactory<AutoFillSettings>.GetSettingProvider(personalSettings, SettingsFeatureKeys.SettingKey);            
         }
 
         public override string Name => nameof(UpdateFieldsDocumentActivity);
@@ -71,17 +66,37 @@ namespace UpdateFieldsDocumentActivity
                 return Task.CompletedTask;
             }
 
-            UpdateImportStatus(modifier, context, objectId, resultValueImportStatus);
+            // Обновляем статус
+            UpdateImportStatus(modifier, objectId, resultValueImportStatus);
 
+            // Переименовываем файлы
+            RenameFileTemplate(modifier, backend, context, objectTypeName);
+
+            // Запускаем фоновую задачу монтирования файлов
             _ = MountFileAsync(context, objectTypeName);
 
             return Task.CompletedTask;
         }
 
         /// <summary>
+        /// Кэширование настроек
+        /// </summary>
+        private AutoFillSettings GetCachedSettings()
+        {
+            if (_cachedSettings != null)
+            {
+                return _cachedSettings;
+            }
+
+            _cachedSettings = _settingsUpdateFieldsDocumentIncludePicture.GetSettings();
+
+            return _cachedSettings;
+        }
+
+        /// <summary>
         /// Обновляет атрибут статус импорта и запоминает обработанные статусы
         /// </summary>
-        private void UpdateImportStatus(IObjectModifier modifier, IAutomationEventContext context, Guid objectId, int currentStatus)
+        private void UpdateImportStatus(IObjectModifier modifier, Guid objectId, int currentStatus)
         {
             var newImportStatus = currentStatus == 1 ? 2 : 4;
             modifier.EditById(objectId).SetAttribute("ImportStatus", newImportStatus);
@@ -104,7 +119,7 @@ namespace UpdateFieldsDocumentActivity
                         if (extension != null)
                         {
                             var extensionLower = extension.ToLower();
-                            if (Array.Exists(_docExtensions, ext => ext == extensionLower))
+                            if (Array.Exists(DirectoryService.DOC_EXTENSIONS, ext => ext == extensionLower))
                             {
                                 return true;
                             }
@@ -143,14 +158,15 @@ namespace UpdateFieldsDocumentActivity
                         return;
                 }
 
-                var files = GetWordFiles(pathOld);
-                if (files.Count == 0) 
+                //Получаем все файлы word
+                var files = DirectoryService.GetWordFiles(pathOld);
+                if (files.Count == 0)
                     return;
 
                 //Обновляем поля-изображения 
                 UpdateIncludePictureField(pathOld, files, objectTypeName);
                 //Обновляем поля
-                UpdateFieldsDocuments(pathOld, files);
+                UpdateFieldsDocuments(files);
             }
             finally
             {
@@ -169,13 +185,12 @@ namespace UpdateFieldsDocumentActivity
         {
             if (string.IsNullOrEmpty(objectTypeName)) return;
 
-            var settingsUpdateFieldsDocumentIncludePicture = _settingsUpdateFieldsDocumentIncludePicture.GetSettings();
+            var settingsUpdateFieldsDocumentIncludePicture = GetCachedSettings();
             if (settingsUpdateFieldsDocumentIncludePicture?.Types == null) return;
 
-            var settingsUpdateFieldsCurrentObjectTypes = settingsUpdateFieldsDocumentIncludePicture.Types.Where(n => n.Name == objectTypeName);
+            var settingsUpdateFieldsCurrentObjectTypes = settingsUpdateFieldsDocumentIncludePicture.Types.Where(n => n.Name == objectTypeName && n.Fields != null);
             foreach (var settingsUpdateFieldsCurrentObjectType in settingsUpdateFieldsCurrentObjectTypes)
             {
-                if (settingsUpdateFieldsCurrentObjectType.Fields == null) return;
                 foreach (var field in settingsUpdateFieldsCurrentObjectType.Fields)
                 {
                     if (string.IsNullOrEmpty(field.PilotFileName)
@@ -191,14 +206,66 @@ namespace UpdateFieldsDocumentActivity
                         UpdateIncludePictureWithOpenXml.UpdateIncludePictureFieldPath(file, latestImageFileSafe, field.FileField);
                     }
                 }
+            }            
+        }
+        
+        /// <summary>
+        /// Переименовывает файл по маске
+        /// </summary>
+        /// <param name="pathFolder"></param>
+        /// <param name="files"></param>
+        /// <param name="objectTypeName"></param>
+        public void RenameFileTemplate(IObjectModifier modifier, IAutomationBackend backend, IAutomationEventContext context, string objectTypeName)
+        {
+            if (string.IsNullOrEmpty(objectTypeName)) return;
+
+            var settingsUpdateFieldsDocumentIncludePicture = GetCachedSettings();
+            if (settingsUpdateFieldsDocumentIncludePicture?.Types == null) return;
+
+            var settingsUpdateFieldsCurrentObjectTypes = settingsUpdateFieldsDocumentIncludePicture.Types.Where(n => n.Name == objectTypeName && n.Fields != null);
+            foreach (var settingsUpdateFieldsCurrentObjectType in settingsUpdateFieldsCurrentObjectTypes)
+            {
+                foreach (var field in settingsUpdateFieldsCurrentObjectType.Fields)
+                {
+                    if (string.IsNullOrEmpty(field.PilotFileName)
+                        || string.IsNullOrEmpty(field.NewNameTemplate)) continue;
+                    
+                    //Переименовываем документы
+                    foreach (var childId in context.Source.Children)
+                    {
+                        var child = backend.GetObject(childId);
+                        var currentFileName = Path.GetFileNameWithoutExtension(child.DisplayName);
+                        var currentExtFileName = Path.GetExtension(child.DisplayName);
+                        //
+                        var tests = DirectoryService.GetTextPartsExcludingCurlyBraces(field.NewNameTemplate);
+
+                        var resTests = DirectoryService.AllTextPartsContainedInTarget(tests, currentFileName);
+
+                        if (currentFileName == field.PilotFileName
+                            || resTests)
+                        {
+                            var nameAttribute = DirectoryService.ExtractValuesFromCurlyBraces(field.NewNameTemplate).FirstOrDefault();
+                            //Находим значение по имени атрибута
+                            //var atrPilot = context.Source.Attributes.FirstOrDefault(n => n.Key == nameAttribute);
+                            if (context.Source.Attributes.TryGetValue(nameAttribute, out object atrPilotValue))
+                            {
+                                var newNameTemplate = field.NewNameTemplate.Replace($"{{{nameAttribute}}}", atrPilotValue.ToString());
+
+                                // Значение найдено, работаем с atrPilotValue
+                                //var value = atrPilotValue.ToString();
+                                var newName = $"{newNameTemplate}{currentExtFileName}".Replace("{", "").Replace("}", "");
+                                modifier.EditById(child.Id).SetAttribute("$Title", newName);
+                            }
+                        }
+                    }
+                }
             }
-            return;
         }
 
         /// <summary>
         /// Обновляем поля в документах word
         /// </summary>
-        private bool UpdateFieldsDocuments(string pathFolder, List<string> files)
+        private bool UpdateFieldsDocuments(List<string> files)
         {
             var assemblyLocation = Assembly.GetExecutingAssembly().Location;
             var directoryName = Path.GetDirectoryName(assemblyLocation);
@@ -206,8 +273,6 @@ namespace UpdateFieldsDocumentActivity
 
             if (!File.Exists(exeFile))
                 throw new Exception(string.Format("Ошибка: Не удалось найти файл ShellClientApp.exe в расположении {0}", exeFile));
-
-            //var files = GetWordFiles(pathFolder);
 
             foreach (var file in files)
             {
@@ -237,36 +302,6 @@ namespace UpdateFieldsDocumentActivity
             }
 
             return true;
-        }
-
-        /// <summary>
-        /// Возвращает все файлы word с диска
-        /// </summary>
-        private static List<string> GetWordFiles(string folderPath)
-        {
-            if (string.IsNullOrEmpty(folderPath))
-                return new List<string>();
-
-            if (!Directory.Exists(folderPath))
-                return new List<string>();
-
-            var allFiles = Directory.GetFiles(folderPath, "*.*", SearchOption.AllDirectories);
-            var result = new List<string>();
-
-            foreach (var file in allFiles)
-            {
-                var extension = Path.GetExtension(file);
-                if (extension != null)
-                {
-                    var extensionLower = extension.ToLower();
-                    if (Array.Exists(_docExtensions, ext => ext == extensionLower))
-                    {
-                        result.Add(file);
-                    }
-                }
-            }
-
-            return result;
         }
 
         /// <summary>

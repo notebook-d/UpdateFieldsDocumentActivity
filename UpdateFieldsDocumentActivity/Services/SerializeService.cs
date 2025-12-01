@@ -39,6 +39,7 @@ namespace UpdateFieldsDocumentActivity.Services
                 }
             }
         }
+
         //public static void SerializeToFile<T>(T serializableObject, string fileName)
         //{
         //    var dir = Path.GetDirectoryName(fileName);

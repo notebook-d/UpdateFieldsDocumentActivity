@@ -26,5 +26,8 @@ namespace UpdateFieldsDocumentActivity.Settings
 
         [XmlAttribute("FileField")]
         public string FileField { get; set; }
+
+        [XmlAttribute("NewNameTemplate")]
+        public string NewNameTemplate { get; set; }
     }
 }
