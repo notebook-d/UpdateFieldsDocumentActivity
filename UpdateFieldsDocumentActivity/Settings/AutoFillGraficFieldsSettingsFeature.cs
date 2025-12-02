@@ -13,7 +13,7 @@ namespace UpdateFieldsDocumentActivity.Settings
     {
         public string Key => SettingsFeatureKeys.AutoFillGraficFieldsSettingsFeatureKey;
 
-        public string Title => "Разработка настройки ECM-документы – автозаполнение графических полей файлов";
+        public string Title => "ECM-документы – Автозаполнение графических полей файлов";
 
         public FrameworkElement Editor => null;
 

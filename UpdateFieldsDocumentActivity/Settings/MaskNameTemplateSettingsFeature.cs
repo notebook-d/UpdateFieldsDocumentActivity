@@ -13,7 +13,7 @@ namespace UpdateFieldsDocumentActivity.Settings
     {
         public string Key => SettingsFeatureKeys.MaskNameTemplateSettingsFeatureKey;
 
-        public string Title => "Разработка настройки ECM-документы — маски имен документов по шаблону";
+        public string Title => "ECM-документы — Маски имен документов по шаблону";
 
         public FrameworkElement Editor => null;
 
