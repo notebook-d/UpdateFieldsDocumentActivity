@@ -66,7 +66,8 @@
     <Compile Include="Settings\Providers\PersonalSettingsProxy.cs" />
     <Compile Include="Settings\Providers\SettingProvider.cs" />
     <Compile Include="Settings\Providers\SettingValueProviderProxy.cs" />
-    <Compile Include="Settings\SettingsFeature.cs" />
+    <Compile Include="Settings\MaskNameTemplateSettingsFeature.cs" />
+    <Compile Include="Settings\AutoFillGraficFieldsSettingsFeature.cs" />
     <Compile Include="Settings\SettingsFeatureKeys.cs" />
     <Compile Include="UpdateFieldsDocumentActivity.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />

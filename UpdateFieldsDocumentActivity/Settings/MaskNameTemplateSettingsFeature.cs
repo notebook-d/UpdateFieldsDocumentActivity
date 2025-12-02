@@ -9,11 +9,11 @@ using System.Windows;
 namespace UpdateFieldsDocumentActivity.Settings
 {
     [Export(typeof(ISettingsFeature2))]
-    public class SampleSettingsFeature : ISettingsFeature2
+    public class MaskNameTemplateSettingsFeature : ISettingsFeature2
     {
-        public string Key => SettingsFeatureKeys.SettingKey;
+        public string Key => SettingsFeatureKeys.MaskNameTemplateSettingsFeatureKey;
 
-        public string Title => "UpdateFieldsDocumentActivity";
+        public string Title => "Разработка настройки ECM-документы — маски имен документов по шаблону";
 
         public FrameworkElement Editor => null;
 

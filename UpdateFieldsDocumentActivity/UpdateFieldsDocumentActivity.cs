@@ -28,8 +28,10 @@ namespace UpdateFieldsDocumentActivity
         private readonly int _delayMountFile = 1000;
 
         private readonly IPersonalSettings _personalSettings;        
-        private readonly ISettingProvider<AutoFillSettings> _settingsUpdateFieldsDocumentIncludePicture;
-        private AutoFillSettings _cachedSettings;
+        private readonly ISettingProvider<AutoFillSettings> _autoFillGraficFieldsSettings;
+        private readonly ISettingProvider<AutoFillSettings> _maskNameTemplateSettings;
+        private AutoFillSettings _cachedAutoFillGraficFieldsSettings;
+        private AutoFillSettings _cachedMaskNameTemplateSettings;
 
         [ImportingConstructor]
         public UpdateFieldsDocumentActivity(IDigitalSigner digitalSigner, IObjectsRepository repository, IPersonalSettings personalSettings)
@@ -38,7 +40,8 @@ namespace UpdateFieldsDocumentActivity
             _repository = repository;
 
             _personalSettings = personalSettings;
-            _settingsUpdateFieldsDocumentIncludePicture = SettingProviderFactory<AutoFillSettings>.GetSettingProvider(personalSettings, SettingsFeatureKeys.SettingKey);            
+            _autoFillGraficFieldsSettings = SettingProviderFactory<AutoFillSettings>.GetSettingProvider(personalSettings, SettingsFeatureKeys.AutoFillGraficFieldsSettingsFeatureKey);
+            _maskNameTemplateSettings = SettingProviderFactory<AutoFillSettings>.GetSettingProvider(personalSettings, SettingsFeatureKeys.MaskNameTemplateSettingsFeatureKey);
         }
 
         public override string Name => nameof(UpdateFieldsDocumentActivity);
@@ -70,7 +73,7 @@ namespace UpdateFieldsDocumentActivity
             UpdateImportStatus(modifier, objectId, resultValueImportStatus);
 
             // Переименовываем файлы
-            RenameFileTemplate(modifier, backend, context, objectTypeName);
+            RenameMaskNameTemplate(modifier, backend, context, objectTypeName);
 
             // Запускаем фоновую задачу монтирования файлов
             _ = MountFileAsync(context, objectTypeName);
@@ -81,16 +84,31 @@ namespace UpdateFieldsDocumentActivity
         /// <summary>
         /// Кэширование настроек
         /// </summary>
-        private AutoFillSettings GetCachedSettings()
+        private AutoFillSettings GetCachedAutoFillGraficFieldsSettings()
         {
-            if (_cachedSettings != null)
+            if (_cachedAutoFillGraficFieldsSettings != null)
             {
-                return _cachedSettings;
+                return _cachedAutoFillGraficFieldsSettings;
             }
 
-            _cachedSettings = _settingsUpdateFieldsDocumentIncludePicture.GetSettings();
+            _cachedAutoFillGraficFieldsSettings = _autoFillGraficFieldsSettings.GetSettings();
 
-            return _cachedSettings;
+            return _cachedAutoFillGraficFieldsSettings;
+        }
+
+        /// <summary>
+        /// Кэширование настроек
+        /// </summary>
+        private AutoFillSettings GetCachedMaskNameTemplateSettings()
+        {
+            if (_cachedMaskNameTemplateSettings != null)
+            {
+                return _cachedMaskNameTemplateSettings;
+            }
+
+            _cachedMaskNameTemplateSettings = _maskNameTemplateSettings.GetSettings();
+
+            return _cachedMaskNameTemplateSettings;
         }
 
         /// <summary>
@@ -164,7 +182,7 @@ namespace UpdateFieldsDocumentActivity
                     return;
 
                 //Обновляем поля-изображения 
-                UpdateIncludePictureField(pathOld, files, objectTypeName);
+                UpdateAutoFillGraficFields(pathOld, files, objectTypeName);
                 //Обновляем поля
                 UpdateFieldsDocuments(files);
             }
@@ -177,18 +195,15 @@ namespace UpdateFieldsDocumentActivity
 
         /// <summary>
         /// Обновляет путь во всех докумннтах word согласно  полях INCLUDEPICTURE в документе.
-        /// </summary>
-        /// <param name="documentPath"></param>
-        /// <param name="newImagePath"></param>
-        /// <param name="settingsUpdateFieldsDocumentIncludePicture"></param>
-        public void UpdateIncludePictureField(string pathFolder, List<string> files, string objectTypeName)
+        /// </summary>        
+        public void UpdateAutoFillGraficFields(string pathFolder, List<string> files, string objectTypeName)
         {
             if (string.IsNullOrEmpty(objectTypeName)) return;
 
-            var settingsUpdateFieldsDocumentIncludePicture = GetCachedSettings();
-            if (settingsUpdateFieldsDocumentIncludePicture?.Types == null) return;
+            var autoFillGraficFieldsSettings = GetCachedAutoFillGraficFieldsSettings();
+            if (autoFillGraficFieldsSettings?.Types == null) return;
 
-            var settingsUpdateFieldsCurrentObjectTypes = settingsUpdateFieldsDocumentIncludePicture.Types.Where(n => n.Name == objectTypeName && n.Fields != null);
+            var settingsUpdateFieldsCurrentObjectTypes = autoFillGraficFieldsSettings.Types.Where(n => n.Name == objectTypeName && n.Fields != null);
             foreach (var settingsUpdateFieldsCurrentObjectType in settingsUpdateFieldsCurrentObjectTypes)
             {
                 foreach (var field in settingsUpdateFieldsCurrentObjectType.Fields)
@@ -215,14 +230,14 @@ namespace UpdateFieldsDocumentActivity
         /// <param name="pathFolder"></param>
         /// <param name="files"></param>
         /// <param name="objectTypeName"></param>
-        public void RenameFileTemplate(IObjectModifier modifier, IAutomationBackend backend, IAutomationEventContext context, string objectTypeName)
+        public void RenameMaskNameTemplate(IObjectModifier modifier, IAutomationBackend backend, IAutomationEventContext context, string objectTypeName)
         {
             if (string.IsNullOrEmpty(objectTypeName)) return;
 
-            var settingsUpdateFieldsDocumentIncludePicture = GetCachedSettings();
-            if (settingsUpdateFieldsDocumentIncludePicture?.Types == null) return;
+            var maskNameTemplateSettings = GetCachedMaskNameTemplateSettings();
+            if (maskNameTemplateSettings?.Types == null) return;
 
-            var settingsUpdateFieldsCurrentObjectTypes = settingsUpdateFieldsDocumentIncludePicture.Types.Where(n => n.Name == objectTypeName && n.Fields != null);
+            var settingsUpdateFieldsCurrentObjectTypes = maskNameTemplateSettings.Types.Where(n => n.Name == objectTypeName && n.Fields != null);
             foreach (var settingsUpdateFieldsCurrentObjectType in settingsUpdateFieldsCurrentObjectTypes)
             {
                 foreach (var field in settingsUpdateFieldsCurrentObjectType.Fields)
