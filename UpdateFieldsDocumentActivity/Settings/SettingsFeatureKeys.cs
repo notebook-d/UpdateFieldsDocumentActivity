@@ -20,5 +20,15 @@ namespace UpdateFieldsDocumentActivity.Settings
                 return "MaskNameTemplateSettingsFeature-38F3E1B1-4F3E-4EBB-A190-86B531AB8C56";
             }
         }
+
+        public static string DocsAutoFillFeatureKey
+        {
+            get
+            {
+                return "DocsAutoFillFeatureKey-d19b557b-2109-4221-8970-794372039186";
+            }
+        }
+
+        
     }
 }

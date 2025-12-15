@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text.RegularExpressions;
+using UpdateFieldsDocumentActivity.Helpers;
 
 
 namespace UpdateFieldsDocumentActivity.Services
@@ -22,7 +23,8 @@ namespace UpdateFieldsDocumentActivity.Services
             // Проверяем существование директории
             if (!Directory.Exists(directoryPath))
             {
-                throw new DirectoryNotFoundException($"Директория не найдена: {directoryPath}");
+                Logger.WriteLog(new LogEntry { Message = $"Поиск изображения {searchPattern} по пути {directoryPath}.", Exception = $"Директория не найдена: {directoryPath}" });
+                return null;
             }
 
             // Расширения графических файлов
@@ -51,17 +53,17 @@ namespace UpdateFieldsDocumentActivity.Services
             }
             catch (DirectoryNotFoundException ex)
             {
-                Console.WriteLine($"Ошибка: {ex.Message}");
+                Logger.WriteLog(new LogEntry { Message = $"Поиск изображения {searchPattern} по пути {directoryPath}.", Exception=$"{ex.Message}" });
                 return null;
             }
             catch (UnauthorizedAccessException ex)
             {
-                Console.WriteLine($"Нет доступа к директории: {ex.Message}");
+                Logger.WriteLog(new LogEntry { Message = $"Поиск изображения {searchPattern} по пути {directoryPath}.", Exception = $"Нет доступа к директории: {ex.Message}" });
                 return null;
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Произошла ошибка при поиске файла: {ex.Message}");
+                Logger.WriteLog(new LogEntry { Message = $"Поиск изображения {searchPattern} по пути {directoryPath}.", Exception = $"Произошла ошибка при поиске файла: {ex.Message}" });
                 return null;
             }
         }
